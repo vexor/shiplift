@@ -408,6 +408,18 @@ pub struct Event {
     pub timeNano: u64,
 }
 
+#[derive(Clone, Debug, RustcEncodable, RustcDecodable)]
+#[allow(non_snake_case)]
+pub struct Volume {
+    pub CreatedAt: String,
+    pub Driver: String,
+    pub Labels: Option<HashMap<String, String>>,
+    pub Mountpoint: String,
+    pub Name: String,
+    pub Options: Option<HashMap<String, String>>,
+    pub Scope: String,
+}
+
 #[derive(Clone, Debug)]
 pub enum Status {
     Untagged(String),

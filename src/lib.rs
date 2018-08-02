@@ -54,7 +54,7 @@ use openssl::ssl::{SslConnectorBuilder, SslMethod};
 use openssl::x509::X509_FILETYPE_PEM;
 use rep::{Change, Container as ContainerRep, ContainerCreateInfo,
           ContainerDetails, Event, Exit, History, ImageDetails, Info,
-          SearchResult, Stats, Status, Top, Version};
+          SearchResult, Stats, Status, Top, Version, Volume as VolumeRep};
 use rep::{NetworkCreateInfo, NetworkDetails as NetworkInfo};
 use rep::Image as ImageRep;
 use rustc_serialize::json::{self, Json};
@@ -623,6 +623,52 @@ impl<'a, 'b> Network<'a, 'b> {
     }
 }
 
+pub struct Volumes<'a> {
+    docker: &'a Docker,
+}
+
+impl<'a> Volumes<'a> {
+    /// Exports an interface for interacting with docker Volumes
+    pub fn new(docker: &'a Docker) -> Volumes<'a> {
+        Volumes { docker: docker }
+    }
+
+    /// Returns a reference to a set of operations available to a specific volume
+    pub fn get(&'a self, id: &'a str) -> Volume {
+        Volume::new(self.docker, id)
+    }
+}
+
+/// Interface for accessing and manipulating a docker volume
+pub struct Volume<'a, 'b> {
+    docker: &'a Docker,
+    id: Cow<'b, str>,
+}
+
+impl<'a, 'b> Volume<'a, 'b> {
+    /// Exports an interface exposing operations against a volume instance
+    pub fn new<S>(docker: &'a Docker, id: S) -> Volume<'a, 'b>
+        where
+            S: Into<Cow<'b, str>>,
+    {
+        Volume {
+            docker: docker,
+            id: id.into(),
+        }
+    }
+
+    /// a getter for the Volume id
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Inspects the current docker volume
+    pub fn inspect(&self) -> Result<VolumeRep> {
+        let raw = self.docker.get(&format!("/volumes/{}", self.id)[..])?;
+        Ok(json::decode::<VolumeRep>(&raw)?)
+    }
+}
+
 // https://docs.docker.com/reference/api/docker_remote_api_v1.17/
 impl Docker {
     /// constructs a new Docker instance for a docker host listening at a url specified by an env var `DOCKER_HOST`,
@@ -714,6 +760,10 @@ impl Docker {
 
     pub fn networks<'a>(&'a self) -> Networks {
         Networks::new(self)
+    }
+
+    pub fn volumes<'a>(&'a self) -> Volumes {
+        Volumes::new(self)
     }
 
     /// Returns version information associated with the docker daemon
