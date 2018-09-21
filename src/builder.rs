@@ -573,7 +573,8 @@ impl ContainerOptionsBuilder {
 }
 
 pub struct ExecContainerOptions {
-    params: HashMap<&'static str, Vec<String>>,
+    params: HashMap<&'static str, Json>,
+    params_list: HashMap<&'static str, Vec<String>>,
     params_bool: HashMap<&'static str, bool>,
 }
 
@@ -587,10 +588,13 @@ impl ExecContainerOptions {
     pub fn serialize(&self) -> Result<String> {
         let mut body = BTreeMap::new();
 
-        for (k, v) in &self.params {
+        for (k, v) in &self.params_list {
             body.insert(k.to_string(), v.to_json());
         }
         for (k, v) in &self.params_bool {
+            body.insert(k.to_string(), v.to_json());
+        }
+        for (k, v) in &self.params {
             body.insert(k.to_string(), v.to_json());
         }
 
@@ -601,7 +605,8 @@ impl ExecContainerOptions {
 
 #[derive(Default)]
 pub struct ExecContainerOptionsBuilder {
-    params: HashMap<&'static str, Vec<String>>,
+    params: HashMap<&'static str, Json>,
+    params_list: HashMap<&'static str, Vec<String>>,
     params_bool: HashMap<&'static str, bool>,
 }
 
@@ -609,6 +614,7 @@ impl ExecContainerOptionsBuilder {
     pub fn new() -> ExecContainerOptionsBuilder {
         ExecContainerOptionsBuilder {
             params: HashMap::new(),
+            params_list: HashMap::new(),
             params_bool: HashMap::new(),
         }
     }
@@ -616,7 +622,7 @@ impl ExecContainerOptionsBuilder {
     /// Command to run, as an array of strings
     pub fn cmd(&mut self, cmds: Vec<&str>) -> &mut ExecContainerOptionsBuilder {
         for cmd in cmds {
-            self.params.entry("Cmd").or_insert(Vec::new()).push(
+            self.params_list.entry("Cmd").or_insert(Vec::new()).push(
                 cmd.to_owned(),
             );
         }
@@ -626,7 +632,7 @@ impl ExecContainerOptionsBuilder {
     /// A list of environment variables in the form "VAR=value"
     pub fn env(&mut self, envs: Vec<&str>) -> &mut ExecContainerOptionsBuilder {
         for env in envs {
-            self.params.entry("Env").or_insert(Vec::new()).push(
+            self.params_list.entry("Env").or_insert(Vec::new()).push(
                 env.to_owned(),
             );
         }
@@ -651,9 +657,20 @@ impl ExecContainerOptionsBuilder {
         self
     }
 
+    /// The user, and optionally, group to run the exec process inside the container.
+    /// Format is one of: `user`, `user:group`, `uid`, or `uid:gid`
+    pub fn user(&mut self, user: &str) -> &mut ExecContainerOptionsBuilder {
+        self.params.insert(
+            "User",
+            Json::String(user.to_owned()),
+        );
+        self
+    }
+
     pub fn build(&self) -> ExecContainerOptions {
         ExecContainerOptions {
             params: self.params.clone(),
+            params_list: self.params_list.clone(),
             params_bool: self.params_bool.clone(),
         }
     }
