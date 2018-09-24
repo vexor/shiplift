@@ -33,6 +33,7 @@ pub mod builder;
 pub mod rep;
 pub mod transport;
 pub mod errors;
+pub mod logger;
 pub mod tty;
 
 mod tarball;
@@ -69,6 +70,7 @@ use tty::Tty;
 use url::form_urlencoded;
 use builder::VolumeCreateOptions;
 use rep::VolumeCreateInfo;
+use logger::Logger;
 
 /// Represents the result of all docker operations
 pub type Result<T> = std::result::Result<T, Error>;
@@ -434,6 +436,38 @@ impl<'a, 'b> Container<'a, 'b> {
         }
         self.docker.delete(&path.join("?"))?;
         Ok(())
+    }
+
+    pub fn exec_with_logger<L>(&self, opts: &ExecContainerOptions, logger: Box<L>) -> Result<()>
+    where L: Logger + Send + 'static,
+    {
+        let data = opts.serialize()?;
+        let mut bytes = data.as_bytes();
+        match self.docker.post(
+            &format!("/containers/{}/exec", self.id)[..],
+            Some((&mut bytes, ContentType::json())),
+        ) {
+            Err(e) => Err(e),
+            Ok(res) => {
+                let data = "{}";
+                let mut bytes = data.as_bytes();
+                self.docker
+                    .stream_post(
+                        &format!(
+                            "/exec/{}/start",
+                            Json::from_str(res.as_str())
+                                .unwrap()
+                                .search("Id")
+                                .unwrap()
+                                .as_string()
+                                .unwrap()
+                        )
+                            [..],
+                        Some((&mut bytes, ContentType::json())),
+                    )
+                    .map(|stream| logger.process(stream))
+            }
+        }
     }
 
     /// Exec the specified command in the container
