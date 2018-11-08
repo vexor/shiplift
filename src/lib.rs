@@ -439,7 +439,7 @@ impl<'a, 'b> Container<'a, 'b> {
     }
 
     pub fn exec_with_logger<L>(&self, opts: &ExecContainerOptions, logger: Box<L>) -> Result<()>
-    where L: Logger + Send + 'static,
+    where L: Logger,
     {
         let data = opts.serialize()?;
         let mut bytes = data.as_bytes();
